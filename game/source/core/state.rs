@@ -12,6 +12,7 @@ pub struct State<'a> {
 
     // from winit
     window: &'a Window,
+    render_pipeline: wgpu::RenderPipeline,
 }
 
 impl<'window> State<'window> {
@@ -76,6 +77,56 @@ impl<'window> State<'window> {
 
         surface.configure(&device, &config);
 
+        // load shader entry point
+        let shader = Self::load_shader(&device, include_str!("../shaders/shader.wgsl"));
+
+        // create render pipeline layout
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+
+        // create render pipeline
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw, // 2.
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None, // 1.
+            multisample: wgpu::MultisampleState {
+                count: 1,                         // 2.
+                mask: !0,                         // 3.
+                alpha_to_coverage_enabled: false, // 4.
+            },
+            multiview: None, // 5.
+            cache: None,     // 6.
+        });
+
         // assign the configuration to the surface
         Self {
             surface,
@@ -84,7 +135,15 @@ impl<'window> State<'window> {
             config,
             size,
             window,
+            render_pipeline,
         }
+    }
+
+    fn load_shader(device: &wgpu::Device, path: &str) -> wgpu::ShaderModule {
+        return device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Shader"),
+            source: wgpu::ShaderSource::Wgsl(path.into()),
+        });
     }
 
     /// Get a reference to the window associated with the state
@@ -138,7 +197,7 @@ impl<'window> State<'window> {
         // do the following in a block so that the borrow of encoder is dropped before we submit it
         {
             // start a render pass
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -157,6 +216,14 @@ impl<'window> State<'window> {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
+            render_pass.set_pipeline(&self.render_pipeline);
+
+            // draw a cool triangle
+            render_pass.draw(0..3, 0..1);
+
+            // draw another cool triangle
+            render_pass.draw(4..7, 0..1);
         }
 
         // submit the rendered frame to the queue
