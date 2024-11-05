@@ -1,5 +1,9 @@
+mod core;
 mod utils;
 
+use core::app::App;
+
 fn main() {
-    utils::app::App::init();
+    // run the app - use pollster to block on the async run function
+    pollster::block_on(App::run());
 }

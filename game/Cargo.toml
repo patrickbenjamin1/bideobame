@@ -8,6 +8,9 @@ name = "bideobame"
 path = "source/main.rs"
 
 [dependencies]
-winit = "0.30.0"
+# using an old version of winit, because wgpu docs are not updated for the latest version, and the latest version 
+# of winit makes it harder to use the async initialisation necessary in wgpu (at least, harder for a rust noob to figure out)
+winit = "0.29.15"
 wgpu = "23.0.0"
 pollster = "0.4.0"
+tokio = { version = "1", features = ["full"] }
