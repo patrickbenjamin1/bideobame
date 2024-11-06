@@ -1,23 +1,30 @@
+use crate::core::geometry;
+use bytemuck;
 use wgpu;
-use winit::event::WindowEvent;
-use winit::window::Window;
+use wgpu::util::DeviceExt;
+use winit;
 
 /// singleton state object that holds the wgpu device, queue, and surface
 pub struct State<'a> {
+    // from wgpu
     surface: wgpu::Surface<'a>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-    pub size: winit::dpi::PhysicalSize<u32>,
+    size: winit::dpi::PhysicalSize<u32>,
+    render_pipeline: wgpu::RenderPipeline,
+    vertex_buffer: wgpu::Buffer,
+
+    // temp
+    num_vertices: u32,
 
     // from winit
-    window: &'a Window,
-    render_pipeline: wgpu::RenderPipeline,
+    window: &'a winit::window::Window,
 }
 
 impl<'window> State<'window> {
     // Creating some of the wgpu types requires async code
-    pub async fn new(window: &'window Window) -> State<'window> {
+    pub async fn new(window: &'window winit::window::Window) -> State<'window> {
         // get the size from the winit window
         let size = window.inner_size();
 
@@ -95,7 +102,7 @@ impl<'window> State<'window> {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[],
+                buffers: &[geometry::Vertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -111,20 +118,27 @@ impl<'window> State<'window> {
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw, // 2.
+                front_face: wgpu::FrontFace::Ccw,
                 cull_mode: Some(wgpu::Face::Back),
                 polygon_mode: wgpu::PolygonMode::Fill,
                 unclipped_depth: false,
                 conservative: false,
             },
-            depth_stencil: None, // 1.
+            depth_stencil: None,
             multisample: wgpu::MultisampleState {
-                count: 1,                         // 2.
-                mask: !0,                         // 3.
-                alpha_to_coverage_enabled: false, // 4.
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
             },
-            multiview: None, // 5.
-            cache: None,     // 6.
+            multiview: None,
+            cache: None,
+        });
+
+        // create vertex buffer
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(geometry::VERTICES),
+            usage: wgpu::BufferUsages::VERTEX,
         });
 
         // assign the configuration to the surface
@@ -136,6 +150,8 @@ impl<'window> State<'window> {
             size,
             window,
             render_pipeline,
+            vertex_buffer,
+            num_vertices: geometry::VERTICES.len() as u32,
         }
     }
 
@@ -147,7 +163,7 @@ impl<'window> State<'window> {
     }
 
     /// Get a reference to the window associated with the state
-    pub fn window(&self) -> &Window {
+    pub fn window(&self) -> &winit::window::Window {
         &self.window
     }
 
@@ -165,13 +181,17 @@ impl<'window> State<'window> {
         self.surface.configure(&self.device, &self.config);
     }
 
-    fn input(&mut self, event: &WindowEvent) -> bool {
-        todo!()
+    pub fn size(&self) -> winit::dpi::PhysicalSize<u32> {
+        self.size
     }
 
     /// handle a window event - returns a boolean indicating whether state handled the event
     /// @note I've removed this for now in favour of keeping event handling at the App level, with the intention of calling functions on here and passing
     /// events to the game event system
+
+    // fn input(&mut self, event: &winit::event::WindowEvent) -> bool {
+    //     todo!()
+    // }
 
     // fn update(&mut self) {
     //     return false;
@@ -219,11 +239,9 @@ impl<'window> State<'window> {
 
             render_pass.set_pipeline(&self.render_pipeline);
 
-            // draw a cool triangle
-            render_pass.draw(0..3, 0..1);
-
-            // draw another cool triangle
-            render_pass.draw(4..7, 0..1);
+            // draw vertex buffer
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.draw(0..self.num_vertices, 0..1);
         }
 
         // submit the rendered frame to the queue

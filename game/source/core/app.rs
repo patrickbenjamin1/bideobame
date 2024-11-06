@@ -57,6 +57,7 @@ impl App {
                         println!("Resized window to {:?}", physical_size);
 
                         // update wgpu surface with new size
+                        // @todo debounce resize events as this will get expensive
                         state.resize(*physical_size);
 
                         // @todo dispatch resize event to game event system
@@ -80,7 +81,7 @@ impl App {
 
                             // Reconfigure the surface if it's lost or outdated
                             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                                state.resize(state.size)
+                                state.resize(state.size())
                             }
 
                             // The system is out of memory, we should probably quit
