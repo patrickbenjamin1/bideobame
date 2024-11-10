@@ -1,4 +1,4 @@
-use crate::core::state::State;
+use crate::core::renderer::Renderer;
 use crate::utils::log;
 
 use winit::event_loop::ControlFlow;
@@ -25,14 +25,14 @@ impl App {
         event_loop.set_control_flow(ControlFlow::Poll);
 
         // define global wgpu state - holds device, queue, surface, etc.
-        let mut state = State::new(&window).await;
+        let mut state = Renderer::new(&window).await;
 
         // run event loop
         let result = event_loop.run(move |event, event_loop_window_target| match event {
             // handle events
             winit::event::Event::WindowEvent {
                 ref event,
-                window_id,
+                // window_id,
                 ..
             } => {
                 match event {
