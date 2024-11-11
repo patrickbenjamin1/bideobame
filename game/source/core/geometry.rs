@@ -174,7 +174,7 @@ pub struct GeometryManager {
 
 /**
  * @todo
- * - allow for dynamic freeing of space in the buffers and store them in the struct, allow add_vertices to insert into the free space
+ * - LOL NAH THIS IS UNNECESSARY - EACH MESH CAN HAVE ITS OWN BUFFER
  */
 
 impl GeometryManager {

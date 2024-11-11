@@ -4,6 +4,7 @@ use wgpu;
 use winit;
 
 /// singleton state object that holds the wgpu device, queue, and surface
+
 pub struct Renderer<'a> {
     // from wgpu
     surface: wgpu::Surface<'a>,
@@ -279,7 +280,17 @@ impl<'window> Renderer<'window> {
         Result::Ok(())
     }
 
+    // accessors
+
     pub fn geometry_manager(&mut self) -> &mut geometry::GeometryManager {
         &mut self.geometry_manager
+    }
+
+    pub fn queue(&self) -> Arc<Mutex<wgpu::Queue>> {
+        self.queue.clone()
+    }
+
+    pub fn device(&self) -> Arc<Mutex<wgpu::Device>> {
+        self.device.clone()
     }
 }

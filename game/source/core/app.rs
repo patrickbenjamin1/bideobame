@@ -2,6 +2,7 @@ use crate::components::mesh_component;
 use crate::core::game;
 use crate::core::renderer::Renderer;
 use crate::utils::log;
+use std::sync::{Arc, Mutex};
 
 use winit::event_loop::ControlFlow;
 use winit::window::WindowBuilder;
@@ -37,7 +38,7 @@ impl App {
         // run event loop
         let result = event_loop.run(move |event, event_loop_window_target| {
             // run systems
-            world.run_systems();
+            world.run_systems(&mut renderer);
 
             // handle window events
             match event {
