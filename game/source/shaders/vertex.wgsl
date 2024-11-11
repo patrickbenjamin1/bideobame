@@ -1,33 +1,41 @@
 struct VertexInput {
-    @location(0) position : vec3<f32>,
-    @location(1) color : vec3<f32>,
-    @location(2) should_wave : u32,
+    @location(0) position: vec3<f32>,
+    @location(1) color: vec3<f32>,
+    @location(2) should_wave: u32,
 };
 
 struct VertexOutput {
-    @builtin(position) clip_position : vec4<f32>,
-    @location(0) color : vec3<f32>,
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) color: vec3<f32>,
+    @location(1) should_wave: u32,
 };
 
-fn make_wave(model: vec3<f32>) -> vec3<f32> {
-    return vec3<f32>(
-        model.x + sin(model.y * 10.0) * 0.1,
-        model.y + sin(model.x * 10.0) * 0.1,
-        model.z
-    );
-}
+struct Uniforms {
+    time: vec4<f32>,
+    projection: mat4x4<f32>,
+    view: mat4x4<f32>,
+};
+
+@group(0) @binding(0)
+var<uniform> uniforms: Uniforms;
 
 @vertex
-fn vs_main(model: VertexInput) -> VertexOutput {
+fn vs_main(
+    model: VertexInput,
+) -> VertexOutput {
     var out: VertexOutput;
-    // Pass color directly without modification
-    out.color = model.color;
     
-    var final_position = model.position;
+    // Apply wave effect if should_wave is 1
+    var position = model.position;
     if (model.should_wave == 1u) {
-        final_position = make_wave(model.position);
+        position.y += sin(uniforms.time[0] * 4.0 + position.x * 2.0) * 0.2;
     }
     
-    out.clip_position = vec4<f32>(final_position, 1.0);
+
+    out.clip_position = uniforms.projection * uniforms.view * vec4<f32>(position, 1.0);
+    
+    out.color = model.color;
+    out.should_wave = model.should_wave;
+    
     return out;
 }

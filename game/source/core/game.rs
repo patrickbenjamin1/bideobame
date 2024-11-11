@@ -1,12 +1,11 @@
 use crate::components::mesh_component;
 use crate::core::renderer;
-
+use crate::core::state;
 use crate::systems::{mesh_bufferer_system, mesh_renderer_system};
 
 use std::any::Any;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use wgpu;
+use std::sync::Mutex;
 
 use super::geometry;
 
@@ -87,6 +86,7 @@ pub struct World {
     component_storage: ComponentStorage,
     update_systems: Vec<Box<dyn System>>,
     draw_systems: Vec<Box<dyn System>>,
+    state: state::GameState,
 }
 
 impl World {
@@ -96,6 +96,7 @@ impl World {
             component_storage: ComponentStorage::default(),
             update_systems: Vec::new(),
             draw_systems: Vec::new(),
+            state: state::GameState::new(),
         }
     }
 
@@ -117,9 +118,11 @@ impl World {
 
     pub fn run_update_systems(&mut self, renderer: &mut renderer::Renderer) {
         let systems = std::mem::take(&mut self.update_systems);
+
         for system in systems.iter() {
             system.run(self, renderer);
         }
+
         self.update_systems = systems;
     }
 
@@ -169,5 +172,9 @@ impl World {
 
     pub fn draw_systems(&self) -> &Vec<Box<dyn System>> {
         &self.draw_systems
+    }
+
+    pub fn state(&mut self) -> &mut state::GameState {
+        &mut self.state
     }
 }

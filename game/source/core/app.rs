@@ -1,7 +1,7 @@
 use crate::core::game;
 use crate::core::renderer::Renderer;
 
-use std::sync::Arc;
+use std::time::{Duration, Instant};
 use winit::event_loop::ControlFlow;
 use winit::window::WindowBuilder;
 
@@ -23,7 +23,7 @@ impl App {
         let window = WindowBuilder::new().build(&event_loop).unwrap();
 
         // set event loop to constantly poll
-        event_loop.set_control_flow(ControlFlow::Poll);
+        event_loop.set_control_flow(ControlFlow::wait_duration(Duration::from_millis(16))); // ~60 FPS
 
         // define global wgpu state - holds device, queue, surface, etc.
         let mut renderer = Renderer::new(&window).await;
@@ -33,13 +33,25 @@ impl App {
 
         world.test_world();
 
+        let mut last_frame = Instant::now();
+
         // Add debug before each system run
         let result = event_loop.run(move |event, event_loop_window_target| {
-            // Run update systems every event loop frame
-            world.run_update_systems(&mut renderer);
+            // calculate time since last frame
+            let now = Instant::now();
+            let delta_time = (now - last_frame).as_secs_f32();
+            last_frame = now;
+
+            // update world state to reflect time passed
+            world.state().update(delta_time);
 
             // handle window events
             match event {
+                winit::event::Event::AboutToWait { .. } => {
+                    // run update systems
+                    world.run_update_systems(&mut renderer);
+                }
+
                 // handle events
                 winit::event::Event::WindowEvent {
                     ref event,

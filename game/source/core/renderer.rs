@@ -1,9 +1,18 @@
 use crate::core::geometry;
+use std::mem;
 use std::sync::{Arc, Mutex};
 use wgpu;
 use winit;
 
 /// singleton state object that holds the wgpu device, queue, and surface
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct GlobalUniforms {
+    pub time: [f32; 4],
+    pub projection: [f32; 16],
+    pub view: [f32; 16],
+}
 
 pub struct Renderer<'a> {
     // from wgpu
@@ -16,6 +25,10 @@ pub struct Renderer<'a> {
 
     // from winit
     window: &'a winit::window::Window,
+
+    global_uniform_buffer: wgpu::Buffer,
+    global_bind_group: wgpu::BindGroup,
+    global_bind_group_layout: wgpu::BindGroupLayout,
 }
 
 impl<'window> Renderer<'window> {
@@ -80,8 +93,41 @@ impl<'window> Renderer<'window> {
 
         surface.configure(&device, &config);
 
+        // Create global uniform buffer and bind group
+        let global_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Global Uniform Buffer"),
+            size: mem::size_of::<GlobalUniforms>() as wgpu::BufferAddress,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let global_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Global Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Global Bind Group"),
+            layout: &global_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: global_uniform_buffer.as_entire_binding(),
+            }],
+        });
+
         // create render pipeline
-        let render_pipeline = Self::init_render_pipeline(&device, &config);
+        let render_pipeline =
+            Self::init_render_pipeline(&device, &config, &global_bind_group_layout);
 
         // create shareable device and queue
         let device = Arc::new(Mutex::new(device));
@@ -96,12 +142,16 @@ impl<'window> Renderer<'window> {
             size,
             window,
             render_pipeline,
+            global_uniform_buffer,
+            global_bind_group,
+            global_bind_group_layout,
         }
     }
 
     fn init_render_pipeline(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
+        global_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> wgpu::RenderPipeline {
         // load shaders
         let vertex_shader = Self::load_shader(&device, include_str!("../shaders/vertex.wgsl"));
@@ -111,7 +161,7 @@ impl<'window> Renderer<'window> {
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[],
+                bind_group_layouts: &[global_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -121,13 +171,13 @@ impl<'window> Renderer<'window> {
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &vertex_shader,
-                entry_point: Some("vs_main"), // Remove Some()
+                entry_point: Some("vs_main"),
                 buffers: &[geometry::Vertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &fragment_shader,
-                entry_point: Some("fs_main"), // Remove Some()
+                entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
                     blend: Some(wgpu::BlendState {
@@ -225,5 +275,23 @@ impl<'window> Renderer<'window> {
 
     pub fn render_pipeline(&self) -> &wgpu::RenderPipeline {
         &self.render_pipeline
+    }
+
+    // Add accessor for global bind group
+    pub fn global_bind_group(&self) -> &wgpu::BindGroup {
+        &self.global_bind_group
+    }
+
+    // Add method to update global uniforms
+    pub fn update_global_uniforms(&self, uniforms: GlobalUniforms) {
+        self.queue.lock().unwrap().write_buffer(
+            &self.global_uniform_buffer,
+            0,
+            bytemuck::cast_slice(&[uniforms]),
+        );
+    }
+
+    pub fn size(&self) -> winit::dpi::PhysicalSize<u32> {
+        self.size
     }
 }
