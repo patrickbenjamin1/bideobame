@@ -14,9 +14,6 @@ pub struct Renderer<'a> {
     size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
 
-    // from geometry
-    geometry_manager: geometry::GeometryManager,
-
     // from winit
     window: &'a winit::window::Window,
 }
@@ -90,13 +87,6 @@ impl<'window> Renderer<'window> {
         let device = Arc::new(Mutex::new(device));
         let queue = Arc::new(Mutex::new(queue));
 
-        // create a geometry manager instance
-        let mut geometry_manager = geometry::GeometryManager::init(device.clone(), queue.clone());
-
-        // THIS BIT IS TEMP
-        let (vertices, indices) = geometry::get_vertices(false);
-        geometry_manager.insert_mesh(vertices, indices);
-
         // assign the configuration to the surface
         Self {
             surface,
@@ -106,7 +96,6 @@ impl<'window> Renderer<'window> {
             size,
             window,
             render_pipeline,
-            geometry_manager,
         }
     }
 
@@ -132,16 +121,19 @@ impl<'window> Renderer<'window> {
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &vertex_shader,
-                entry_point: Some("vs_main"),
+                entry_point: Some("vs_main"), // Remove Some()
                 buffers: &[geometry::Vertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &fragment_shader,
-                entry_point: Some("fs_main"),
+                entry_point: Some("fs_main"), // Remove Some()
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent::REPLACE,
+                        alpha: wgpu::BlendComponent::REPLACE,
+                    }),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
@@ -150,7 +142,7 @@ impl<'window> Renderer<'window> {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
+                cull_mode: None, // Change this to None to see both sides
                 polygon_mode: wgpu::PolygonMode::Fill,
                 unclipped_depth: false,
                 conservative: false,
@@ -195,11 +187,6 @@ impl<'window> Renderer<'window> {
             .configure(&self.device.lock().unwrap(), &self.config);
     }
 
-    /// Get the size of the window
-    pub fn size(&self) -> winit::dpi::PhysicalSize<u32> {
-        self.size
-    }
-
     /// handle a window event - returns a boolean indicating whether state handled the event
     /// @note I've removed this for now in favour of keeping event handling at the App level, with the intention of calling functions on here and passing
     /// events to the game event system
@@ -213,84 +200,30 @@ impl<'window> Renderer<'window> {
     // }
 
     /// render the current state to a frame
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        // get the current texture from the surface
-        let output = self.surface.get_current_texture()?;
-
-        // create a view from the texture
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        // create encoder - this is a command buffer for the gpu
-        let mut encoder =
-            self.device
-                .lock()
-                .unwrap()
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
-
-        // do the following in a block so that the borrow of encoder is dropped before we submit it
-        {
-            // start a render pass
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
-
-            // set the pipeline
-            render_pass.set_pipeline(&self.render_pipeline);
-
-            // draw vertex buffer
-            render_pass.set_vertex_buffer(0, self.geometry_manager.vertex_buffer().slice(..));
-            render_pass.set_index_buffer(
-                self.geometry_manager.index_buffer().slice(..),
-                wgpu::IndexFormat::Uint16,
-            );
-
-            // draw the vertices
-            render_pass.draw_indexed(0..self.geometry_manager.num_indices(), 0, 0..1);
-        }
-
-        // submit the rendered frame to the queue
-        self.queue
-            .lock()
-            .unwrap()
-            .submit(std::iter::once(encoder.finish()));
-
-        // render the frame
-        output.present();
-
-        Result::Ok(())
-    }
+    // pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    //     // The actual rendering is now handled by MeshRenderer system
+    //     // This method just ensures the surface is properly configured
+    //     if self.size.width == 0 || self.size.height == 0 {
+    //         return Ok(());
+    //     }
+    //     Ok(())
+    // }
 
     // accessors
 
-    pub fn geometry_manager(&mut self) -> &mut geometry::GeometryManager {
-        &mut self.geometry_manager
+    pub fn queue(&self) -> &Arc<Mutex<wgpu::Queue>> {
+        &self.queue
     }
 
-    pub fn queue(&self) -> Arc<Mutex<wgpu::Queue>> {
-        self.queue.clone()
+    pub fn device(&self) -> &Arc<Mutex<wgpu::Device>> {
+        &self.device
     }
 
-    pub fn device(&self) -> Arc<Mutex<wgpu::Device>> {
-        self.device.clone()
+    pub fn surface(&self) -> &wgpu::Surface {
+        &self.surface
+    }
+
+    pub fn render_pipeline(&self) -> &wgpu::RenderPipeline {
+        &self.render_pipeline
     }
 }

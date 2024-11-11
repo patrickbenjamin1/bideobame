@@ -1,9 +1,7 @@
-use crate::components::mesh_component;
 use crate::core::game;
 use crate::core::renderer::Renderer;
-use crate::utils::log;
-use std::sync::{Arc, Mutex};
 
+use std::sync::Arc;
 use winit::event_loop::ControlFlow;
 use winit::window::WindowBuilder;
 
@@ -35,10 +33,10 @@ impl App {
 
         world.test_world();
 
-        // run event loop
+        // Add debug before each system run
         let result = event_loop.run(move |event, event_loop_window_target| {
-            // run systems
-            world.run_systems(&mut renderer);
+            // Run update systems every event loop frame
+            world.run_update_systems(&mut renderer);
 
             // handle window events
             match event {
@@ -74,7 +72,7 @@ impl App {
                                         winit::keyboard::PhysicalKey::Code(
                                             winit::keyboard::KeyCode::KeyQ,
                                         ) => {
-                                            renderer.geometry_manager().remove_at_mesh_index(0);
+                                            // leaving this as an example
                                         }
 
                                         _ => (),
@@ -120,27 +118,8 @@ impl App {
 
                         // handle redraw events by submitting them to render on state
                         winit::event::WindowEvent::RedrawRequested => {
-                            renderer.window().request_redraw();
-
-                            // render wgpu into winit window
-                            match renderer.render() {
-                                // we rendered successfully
-                                Ok(_) => (),
-
-                                // Reconfigure the surface if it's lost or outdated
-                                Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                                    renderer.resize(renderer.size())
-                                }
-
-                                // The system is out of memory, we should probably quit
-                                Err(wgpu::SurfaceError::OutOfMemory) => {
-                                    log::error("OutOfMemory");
-                                    event_loop_window_target.exit();
-                                }
-
-                                // This happens when the a frame takes too long to present
-                                Err(wgpu::SurfaceError::Timeout) => log::warn("Surface timeout"),
-                            }
+                            // Run draw systems only during redraw
+                            world.run_draw_systems(&mut renderer);
                         }
 
                         _ => (),

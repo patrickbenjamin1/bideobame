@@ -1,7 +1,7 @@
 use crate::components::mesh_component;
 use crate::core::renderer;
 
-use crate::systems::mesh_bufferer_system;
+use crate::systems::{mesh_bufferer_system, mesh_renderer_system};
 
 use std::any::Any;
 use std::collections::HashMap;
@@ -76,14 +76,8 @@ impl Entity {
     }
 }
 
-// New trait to define if a system needs access to the renderer
-pub trait RendererAccess {
-    /// Should just return true or false depending on if the system implementing this trait needs access to the renderer
-    fn needs_renderer(&self) -> bool;
-}
-
 // System trait for implementing systems that act on entities and components
-pub trait System: RendererAccess {
+pub trait System {
     fn run(&self, world: &mut World, renderer: &mut renderer::Renderer);
 }
 
@@ -91,7 +85,8 @@ pub trait System: RendererAccess {
 pub struct World {
     entities: HashMap<EntityId, Entity>,
     component_storage: ComponentStorage,
-    systems: Vec<Box<dyn System>>,
+    update_systems: Vec<Box<dyn System>>,
+    draw_systems: Vec<Box<dyn System>>,
 }
 
 impl World {
@@ -99,7 +94,8 @@ impl World {
         Self {
             entities: HashMap::new(),
             component_storage: ComponentStorage::default(),
-            systems: Vec::new(),
+            update_systems: Vec::new(),
+            draw_systems: Vec::new(),
         }
     }
 
@@ -111,21 +107,28 @@ impl World {
         self.component_storage.add_component(entity, component);
     }
 
-    pub fn add_system<T: System + 'static>(&mut self, system: T) {
-        self.systems.push(Box::new(system));
+    pub fn add_update_system<T: System + 'static>(&mut self, system: T) {
+        self.update_systems.push(Box::new(system));
     }
 
-    pub fn run_systems(&mut self, renderer: &mut renderer::Renderer) {
-        // Take ownership of systems temporarily
-        let systems = std::mem::take(&mut self.systems);
+    pub fn add_draw_system<T: System + 'static>(&mut self, system: T) {
+        self.draw_systems.push(Box::new(system));
+    }
 
-        // Run each system
+    pub fn run_update_systems(&mut self, renderer: &mut renderer::Renderer) {
+        let systems = std::mem::take(&mut self.update_systems);
         for system in systems.iter() {
             system.run(self, renderer);
         }
+        self.update_systems = systems;
+    }
 
-        // Put systems back
-        self.systems = systems;
+    pub fn run_draw_systems(&mut self, renderer: &mut renderer::Renderer) {
+        let systems = std::mem::take(&mut self.draw_systems);
+        for system in systems.iter() {
+            system.run(self, renderer);
+        }
+        self.draw_systems = systems;
     }
 
     pub fn test_world(&mut self) {
@@ -141,7 +144,9 @@ impl World {
             mesh_component::MeshComponent::new(vertices, indices),
         );
 
-        self.add_system(mesh_bufferer_system::MeshBufferer {});
+        // Add systems to appropriate vectors
+        self.add_update_system(mesh_bufferer_system::MeshBufferer {});
+        self.add_draw_system(mesh_renderer_system::MeshRenderer {});
     }
 
     // accessors
@@ -158,7 +163,11 @@ impl World {
         &mut self.component_storage
     }
 
-    pub fn systems(&self) -> &Vec<Box<dyn System>> {
-        &self.systems
+    pub fn update_systems(&self) -> &Vec<Box<dyn System>> {
+        &self.update_systems
+    }
+
+    pub fn draw_systems(&self) -> &Vec<Box<dyn System>> {
+        &self.draw_systems
     }
 }
