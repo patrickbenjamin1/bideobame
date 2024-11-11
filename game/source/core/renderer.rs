@@ -1,5 +1,4 @@
 use crate::core::geometry;
-use bytemuck;
 use std::sync::{Arc, Mutex};
 use wgpu;
 use winit;
@@ -93,8 +92,8 @@ impl<'window> Renderer<'window> {
         // create a geometry manager instance
         let mut geometry_manager = geometry::GeometryManager::init(device.clone(), queue.clone());
 
+        // THIS BIT IS TEMP
         let (vertices, indices) = geometry::get_vertices(false);
-
         geometry_manager.insert_mesh(vertices, indices);
 
         // assign the configuration to the surface
@@ -278,5 +277,9 @@ impl<'window> Renderer<'window> {
         output.present();
 
         Result::Ok(())
+    }
+
+    pub fn geometry_manager(&mut self) -> &mut geometry::GeometryManager {
+        &mut self.geometry_manager
     }
 }

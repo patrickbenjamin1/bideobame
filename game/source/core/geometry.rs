@@ -45,20 +45,44 @@ impl Vertex {
     }
 }
 
-// will probably refactor into a component later
-pub struct Mesh {
+/// describes the positions of a mesh in the vertex buffer
+pub struct MeshBufferPositions {
     vertex_offset: u64,
     index_offset: u64,
     vertex_length: u32,
     index_length: u32,
 }
 
-impl Mesh {
+impl PartialEq for MeshBufferPositions {
+    fn eq(&self, other: &Self) -> bool {
+        // this should be a reliable way to compare meshes (there should never be overlapping offsets, if there is there's a bigger problem than this equality comparison)
+        return self.vertex_offset == other.vertex_offset
+            && self.index_offset == other.index_offset
+            && self.vertex_length == other.vertex_length
+            && self.index_length == other.index_length;
+    }
+}
+
+impl Clone for MeshBufferPositions {
+    fn clone(&self) -> Self {
+        // this should be fine, because it's just values pointing to buffer positions
+        return MeshBufferPositions {
+            vertex_offset: self.vertex_offset,
+            index_offset: self.index_offset,
+            vertex_length: self.vertex_length,
+            index_length: self.index_length,
+        };
+    }
+}
+
+impl MeshBufferPositions {
+    /// take an array of vertices, insert them into the vertex and index buffer, keep details of them in the geometry manager
+    /// and return a description of the mesh's position in the buffers
     pub fn create_with_vertices(
         geometry_manager: &mut GeometryManager,
         vertices: Vec<Vertex>,
         indices: Vec<u16>,
-    ) -> Mesh {
+    ) -> MeshBufferPositions {
         let vertex_offset =
             geometry_manager.num_vertices() as u64 * std::mem::size_of::<Vertex>() as u64;
         let index_offset =
@@ -85,15 +109,22 @@ impl Mesh {
         geometry_manager.num_vertices += vertices.len() as u32;
         geometry_manager.num_indices += indices.len() as u32;
 
-        // return the mesh
-        return Mesh {
+        // create the mesh object
+        let mesh = MeshBufferPositions {
             vertex_offset,
             index_offset,
             vertex_length: vertices.len() as u32,
             index_length: indices.len() as u32,
         };
+
+        // add it to geometry manager's meshes
+        geometry_manager.meshes.push(mesh.clone());
+
+        // return the mesh
+        return mesh;
     }
 
+    /// remove the mesh from the geometry manager
     pub fn remove(self, geometry_manager: &mut GeometryManager) {
         // remove vertices from the buffer
         let locked_queue = geometry_manager.queue.lock().unwrap();
@@ -120,6 +151,9 @@ impl Mesh {
         // update the number of vertices and indices
         geometry_manager.num_vertices -= self.vertex_length;
         geometry_manager.num_indices -= self.index_length;
+
+        // remove it from the geometry manager's meshes
+        geometry_manager.meshes.retain(|m| m != &self);
     }
 }
 
@@ -132,7 +166,7 @@ pub struct GeometryManager {
     num_indices: u32,
 
     // meshes
-    meshes: Vec<Mesh>,
+    meshes: Vec<MeshBufferPositions>,
 
     // wgpu stuff
     queue: Arc<Mutex<wgpu::Queue>>,
@@ -189,8 +223,21 @@ impl GeometryManager {
     }
 
     /// Insert vertices into the geometry manager
-    pub fn insert_mesh(&mut self, vertices: Vec<Vertex>, indices: Vec<u16>) -> Mesh {
-        return Mesh::create_with_vertices(self, vertices, indices);
+    pub fn insert_mesh(&mut self, vertices: Vec<Vertex>, indices: Vec<u16>) -> MeshBufferPositions {
+        let mesh = MeshBufferPositions::create_with_vertices(self, vertices, indices);
+
+        return mesh;
+    }
+
+    /// Remove a meshes vertices from the geometry manager
+    pub fn remove_mesh(&mut self, mesh: MeshBufferPositions) {
+        mesh.remove(self);
+    }
+
+    pub fn remove_at_mesh_index(&mut self, index: usize) {
+        if let Some(mesh) = self.meshes.get(index).cloned() {
+            self.remove_mesh(mesh);
+        }
     }
 
     // accessors for buffers
@@ -209,6 +256,10 @@ impl GeometryManager {
 
     pub fn num_indices(&self) -> u32 {
         return self.num_indices;
+    }
+
+    pub fn meshes(&self) -> &Vec<MeshBufferPositions> {
+        return &self.meshes;
     }
 }
 
