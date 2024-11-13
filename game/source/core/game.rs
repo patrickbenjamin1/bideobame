@@ -1,4 +1,5 @@
 use crate::components::mesh_component;
+use crate::components::transform_component;
 use crate::core::renderer;
 use crate::core::state;
 use crate::systems::{mesh_bufferer_system, mesh_renderer_system};
@@ -145,6 +146,15 @@ impl World {
         self.add_component(
             entity_id,
             mesh_component::MeshComponent::new(vertices, indices),
+        );
+
+        self.add_component(
+            entity_id,
+            transform_component::TransformComponent::new(
+                [0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0],
+                [1.0, 1.0, 1.0],
+            ),
         );
 
         // Add systems to appropriate vectors

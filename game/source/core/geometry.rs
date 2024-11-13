@@ -80,8 +80,8 @@ pub fn get_vertices(add_five: bool) -> (Vec<Vertex>, Vec<u16>) {
     let mut indices: Vec<u16> = vec![];
 
     for i in 0..100 {
-        let y = (i / 10) as f32 * 0.2; // Increased spacing
-        let x = (i % 10) as f32 * 0.2; // Increased spacing
+        let y = (i / 10) as f32 * 0.1; // Increased spacing
+        let x = (i % 10) as f32 * 0.1; // Increased spacing
 
         let triangle = get_triangle(x, y, 0.1);
 

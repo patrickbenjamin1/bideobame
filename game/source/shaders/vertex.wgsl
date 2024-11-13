@@ -27,8 +27,10 @@ fn vs_main(
     
     // Apply wave effect if should_wave is 1
     var position = model.position;
+
     if (model.should_wave == 1u) {
-        position.y += sin(uniforms.time[0] * 4.0 + position.x * 2.0) * 0.2;
+        position.y += sin(uniforms.time[0] * 4.0 + position.x * 2.0) * 0.1 * sin(position.x * 2.0) * 0.5;
+        position.x += sin(uniforms.time[0] * 4.0 + position.y * 2.0) * 0.1 * sin(position.y * 2.0) * 0.5;
     }
     
 
