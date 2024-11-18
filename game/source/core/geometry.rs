@@ -75,38 +75,228 @@ pub fn get_triangle(centre_x: f32, centre_y: f32, size: f32) -> Vec<Vertex> {
     ];
 }
 
-pub fn get_vertices(add_five: bool) -> (Vec<Vertex>, Vec<u16>) {
+pub fn get_ground_quad() -> (Vec<Vertex>, Vec<u16>) {
     let mut vertices: Vec<Vertex> = vec![];
     let mut indices: Vec<u16> = vec![];
 
-    for i in 0..100 {
-        let y = (i / 10) as f32 * 0.1; // Increased spacing
-        let x = (i % 10) as f32 * 0.1; // Increased spacing
+    // draw a flat quad
 
-        let triangle = get_triangle(x, y, 0.1);
+    vertices.push(Vertex {
+        position: [-0.1, 0.0, -0.1],
+        color: [1.0, 0.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, 0.0, -0.1],
+        color: [0.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, 0.0, 0.1],
+        color: [0.0, 0.0, 1.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [-0.1, 0.0, 0.1],
+        color: [1.0, 1.0, 0.0],
+        should_wave: 0,
+    });
 
-        // This part adds vertices and creates indices
-        for vertex in triangle.iter() {
-            if let Some(index) = vertices.iter().position(|v| v == vertex) {
-                indices.push(index as u16);
-            } else {
-                indices.push(vertices.len() as u16);
-                vertices.push(*vertex);
-            }
-        }
-    }
-
-    // for testing stuff
-    if add_five {
-        vertices = vertices
-            .into_iter()
-            .map(|v| Vertex {
-                position: [v.position[0], v.position[1] + 0.1, v.position[2]],
-                color: v.color,
-                should_wave: v.should_wave,
-            })
-            .collect();
-    }
+    indices.push(0);
+    indices.push(1);
+    indices.push(2);
+    indices.push(2);
+    indices.push(3);
+    indices.push(0);
 
     return (vertices, indices);
+}
+
+pub fn get_cube() -> (Vec<Vertex>, Vec<u16>) {
+    let mut vertices: Vec<Vertex> = vec![];
+    let mut indices: Vec<u16> = vec![];
+
+    // draw a cube
+
+    // front
+    vertices.push(Vertex {
+        position: [-0.1, -0.1, -0.1],
+        color: [1.0, 0.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, -0.1, -0.1],
+        color: [0.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, 0.1, -0.1],
+        color: [0.0, 0.0, 1.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [-0.1, 0.1, -0.1],
+        color: [1.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+
+    // back
+    vertices.push(Vertex {
+        position: [-0.1, -0.1, 0.1],
+        color: [1.0, 0.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, -0.1, 0.1],
+        color: [0.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, 0.1, 0.1],
+        color: [0.0, 0.0, 1.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [-0.1, 0.1, 0.1],
+        color: [1.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+
+    // top
+    vertices.push(Vertex {
+        position: [-0.1, 0.1, -0.1],
+        color: [1.0, 0.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, 0.1, -0.1],
+        color: [0.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, 0.1, 0.1],
+        color: [0.0, 0.0, 1.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [-0.1, 0.1, 0.1],
+        color: [1.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+
+    // bottom
+    vertices.push(Vertex {
+        position: [-0.1, -0.1, -0.1],
+        color: [1.0, 0.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, -0.1, -0.1],
+        color: [0.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, -0.1, 0.1],
+        color: [0.0, 0.0, 1.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [-0.1, -0.1, 0.1],
+        color: [1.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+
+    // left
+    vertices.push(Vertex {
+        position: [-0.1, -0.1, -0.1],
+        color: [1.0, 0.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [-0.1, -0.1, 0.1],
+        color: [0.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [-0.1, 0.1, 0.1],
+        color: [0.0, 0.0, 1.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [-0.1, 0.1, -0.1],
+        color: [1.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+
+    // right
+    vertices.push(Vertex {
+        position: [0.1, -0.1, -0.1],
+        color: [1.0, 0.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, -0.1, 0.1],
+        color: [0.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, 0.1, 0.1],
+        color: [0.0, 0.0, 1.0],
+        should_wave: 0,
+    });
+    vertices.push(Vertex {
+        position: [0.1, 0.1, -0.1],
+        color: [1.0, 1.0, 0.0],
+        should_wave: 0,
+    });
+
+    // front
+    indices.push(0);
+    indices.push(1);
+    indices.push(2);
+    indices.push(2);
+    indices.push(3);
+    indices.push(0);
+
+    // back
+    indices.push(4);
+    indices.push(5);
+    indices.push(6);
+    indices.push(6);
+    indices.push(7);
+    indices.push(4);
+
+    // top
+    indices.push(8);
+    indices.push(9);
+    indices.push(10);
+    indices.push(10);
+    indices.push(11);
+    indices.push(8);
+
+    // bottom
+    indices.push(12);
+    indices.push(13);
+    indices.push(14);
+    indices.push(14);
+    indices.push(15);
+    indices.push(12);
+
+    // left
+    indices.push(16);
+    indices.push(17);
+    indices.push(18);
+    indices.push(18);
+    indices.push(19);
+    indices.push(16);
+
+    // right
+    indices.push(20);
+    indices.push(21);
+    indices.push(22);
+    indices.push(22);
+    indices.push(23);
+    indices.push(20);
+
+    (vertices, indices)
 }

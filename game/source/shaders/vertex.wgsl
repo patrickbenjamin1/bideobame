@@ -19,6 +19,9 @@ struct Uniforms {
 @group(0) @binding(0)
 var<uniform> uniforms: Uniforms;
 
+@group(1) @binding(0)
+var<uniform> transform: mat4x4<f32>;
+
 @vertex
 fn vs_main(
     model: VertexInput,
@@ -34,7 +37,7 @@ fn vs_main(
     }
     
 
-    out.clip_position = uniforms.projection * uniforms.view * vec4<f32>(position, 1.0);
+    out.clip_position = uniforms.projection * uniforms.view * transform * vec4<f32>(position, 1.0);
     
     out.color = model.color;
     out.should_wave = model.should_wave;

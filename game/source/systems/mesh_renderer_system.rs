@@ -1,8 +1,6 @@
-use crate::components::{mesh_component::MeshComponent, transform_component::TransformComponent};
 use crate::core::{game, renderer};
 use glam::{Mat4, Vec3};
 
-/// System to render meshes that have been buffered
 pub struct MeshRenderer {}
 
 impl game::System for MeshRenderer {
@@ -31,10 +29,7 @@ impl game::System for MeshRenderer {
 
         let output = match renderer.surface().get_current_texture() {
             Ok(output) => output,
-            Err(e) => {
-                println!("Failed to get surface texture: {:?}", e);
-                return;
-            }
+            Err(_) => return,
         };
 
         let view = output
@@ -47,8 +42,7 @@ impl game::System for MeshRenderer {
             },
         );
 
-        // Get all components once before the loop
-        let components = world.component_storage().get_components();
+        let mut current_transform_offset = 0;
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -66,7 +60,14 @@ impl game::System for MeshRenderer {
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &renderer.depth_view(),
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
@@ -74,25 +75,45 @@ impl game::System for MeshRenderer {
             render_pass.set_pipeline(renderer.render_pipeline());
             render_pass.set_bind_group(0, renderer.global_bind_group(), &[]);
 
-            // Render each mesh component
-            for (entity_id, component) in components {
-                // Try to get mesh component
-                if let Some(mesh_component) = component.as_any().downcast_ref::<MeshComponent>() {
-                    // Look for a transform component on the same entity
-                    let transform = components
-                        .get(entity_id)
-                        .and_then(|c| c.as_any().downcast_ref::<TransformComponent>());
+            // Get entities that have both Mesh and Transform components
+            let entities = world.get_entities_with_components(&[
+                game::ComponentType::Mesh,
+                game::ComponentType::Transform,
+            ]);
 
+            for entity_id in entities {
+                let mesh = world.get_entity_component_by_type(entity_id, game::ComponentType::Mesh);
+                let transform =
+                    world.get_entity_component_by_type(entity_id, game::ComponentType::Transform);
+
+                if let (
+                    Some(game::ComponentEnum::Mesh(mesh)),
+                    Some(game::ComponentEnum::Transform(transform)),
+                ) = (mesh, transform)
+                {
                     if let (Some(vertex_buffer), Some(index_buffer)) =
-                        (&mesh_component.vertex_buffer, &mesh_component.index_buffer)
+                        (&mesh.vertex_buffer, &mesh.index_buffer)
                     {
-                        // Update per-object uniforms if needed
-                        // renderer.update_model_matrix(model_matrix.to_cols_array());
+                        // Update transform uniforms with the model matrix
+                        renderer.update_transform_uniforms_at_offset(
+                            renderer::TransformUniforms {
+                                model: transform.matrix_array(),
+                            },
+                            current_transform_offset as wgpu::BufferAddress,
+                        );
 
+                        render_pass.set_bind_group(
+                            1,
+                            renderer.transform_bind_group(),
+                            &[current_transform_offset],
+                        );
                         render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
                         render_pass
                             .set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                        render_pass.draw_indexed(0..mesh_component.num_indices, 0, 0..1);
+                        render_pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
+
+                        current_transform_offset +=
+                            renderer::Renderer::get_transform_aligned_size() as u32;
                     }
                 }
             }

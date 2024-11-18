@@ -1,5 +1,6 @@
 use crate::core::geometry;
 use std::mem;
+use std::num::NonZeroU64;
 use std::sync::{Arc, Mutex};
 use wgpu;
 use winit;
@@ -12,6 +13,12 @@ pub struct GlobalUniforms {
     pub time: [f32; 4],
     pub projection: [f32; 16],
     pub view: [f32; 16],
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct TransformUniforms {
+    pub model: [f32; 16],
 }
 
 pub struct Renderer<'a> {
@@ -29,6 +36,13 @@ pub struct Renderer<'a> {
     global_uniform_buffer: wgpu::Buffer,
     global_bind_group: wgpu::BindGroup,
     global_bind_group_layout: wgpu::BindGroupLayout,
+
+    transform_uniform_buffer: wgpu::Buffer,
+    transform_bind_group: wgpu::BindGroup,
+    transform_bind_group_layout: wgpu::BindGroupLayout,
+
+    depth_texture: wgpu::Texture,
+    depth_view: wgpu::TextureView,
 }
 
 impl<'window> Renderer<'window> {
@@ -125,9 +139,73 @@ impl<'window> Renderer<'window> {
             }],
         });
 
+        // Modify the transform buffer to be dynamic
+        let transform_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Transform Uniform Buffer"),
+            // Increase size to hold multiple transforms
+            size: (std::mem::size_of::<TransformUniforms>() * 1024) as wgpu::BufferAddress,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let transform_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Transform Bind Group Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: true, // Enable dynamic offsets
+                        min_binding_size: Some(
+                            NonZeroU64::new(std::mem::size_of::<TransformUniforms>() as u64)
+                                .unwrap(),
+                        ),
+                    },
+                    count: None,
+                }],
+            });
+
+        let transform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Transform Bind Group"),
+            layout: &transform_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &transform_uniform_buffer,
+                    offset: 0,
+                    size: Some(
+                        NonZeroU64::new(std::mem::size_of::<TransformUniforms>() as u64).unwrap(),
+                    ),
+                }),
+            }],
+        });
+
+        // Create depth texture
+        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Depth Texture"),
+            size: wgpu::Extent3d {
+                width: size.width,
+                height: size.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
         // create render pipeline
-        let render_pipeline =
-            Self::init_render_pipeline(&device, &config, &global_bind_group_layout);
+        let render_pipeline = Self::init_render_pipeline(
+            &device,
+            &config,
+            &global_bind_group_layout,
+            &transform_bind_group_layout,
+        );
 
         // create shareable device and queue
         let device = Arc::new(Mutex::new(device));
@@ -145,6 +223,11 @@ impl<'window> Renderer<'window> {
             global_uniform_buffer,
             global_bind_group,
             global_bind_group_layout,
+            transform_uniform_buffer,
+            transform_bind_group,
+            transform_bind_group_layout,
+            depth_texture,
+            depth_view,
         }
     }
 
@@ -152,6 +235,7 @@ impl<'window> Renderer<'window> {
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
         global_bind_group_layout: &wgpu::BindGroupLayout,
+        transform_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> wgpu::RenderPipeline {
         // load shaders
         let vertex_shader = Self::load_shader(&device, include_str!("../shaders/vertex.wgsl"));
@@ -161,7 +245,7 @@ impl<'window> Renderer<'window> {
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[global_bind_group_layout],
+                bind_group_layouts: &[global_bind_group_layout, transform_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -197,7 +281,13 @@ impl<'window> Renderer<'window> {
                 unclipped_depth: false,
                 conservative: false,
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState {
                 count: 1,
                 mask: !0,
@@ -235,29 +325,31 @@ impl<'window> Renderer<'window> {
         self.config.height = new_size.height;
         self.surface
             .configure(&self.device.lock().unwrap(), &self.config);
+
+        // Recreate depth texture with new size
+        self.depth_texture = self
+            .device
+            .lock()
+            .unwrap()
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("Depth Texture"),
+                size: wgpu::Extent3d {
+                    width: new_size.width,
+                    height: new_size.height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Depth32Float,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            });
+        self.depth_view = self
+            .depth_texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
     }
-
-    /// handle a window event - returns a boolean indicating whether state handled the event
-    /// @note I've removed this for now in favour of keeping event handling at the App level, with the intention of calling functions on here and passing
-    /// events to the game event system
-
-    // fn input(&mut self, event: &winit::event::WindowEvent) -> bool {
-    //     todo!()
-    // }
-
-    // fn update(&mut self) {
-    //     return false;
-    // }
-
-    /// render the current state to a frame
-    // pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-    //     // The actual rendering is now handled by MeshRenderer system
-    //     // This method just ensures the surface is properly configured
-    //     if self.size.width == 0 || self.size.height == 0 {
-    //         return Ok(());
-    //     }
-    //     Ok(())
-    // }
 
     // accessors
 
@@ -277,12 +369,14 @@ impl<'window> Renderer<'window> {
         &self.render_pipeline
     }
 
-    // Add accessor for global bind group
+    pub fn depth_view(&self) -> &wgpu::TextureView {
+        &self.depth_view
+    }
+
     pub fn global_bind_group(&self) -> &wgpu::BindGroup {
         &self.global_bind_group
     }
 
-    // Add method to update global uniforms
     pub fn update_global_uniforms(&self, uniforms: GlobalUniforms) {
         self.queue.lock().unwrap().write_buffer(
             &self.global_uniform_buffer,
@@ -291,7 +385,37 @@ impl<'window> Renderer<'window> {
         );
     }
 
+    pub fn transform_bind_group(&self) -> &wgpu::BindGroup {
+        &self.transform_bind_group
+    }
+
+    pub fn update_transform_uniforms(&self, uniforms: TransformUniforms) {
+        self.queue.lock().unwrap().write_buffer(
+            &self.transform_uniform_buffer,
+            0,
+            bytemuck::cast_slice(&[uniforms]),
+        );
+    }
+
+    pub fn update_transform_uniforms_at_offset(
+        &self,
+        uniforms: TransformUniforms,
+        offset: wgpu::BufferAddress,
+    ) {
+        self.queue.lock().unwrap().write_buffer(
+            &self.transform_uniform_buffer,
+            offset,
+            bytemuck::cast_slice(&[uniforms]),
+        );
+    }
+
     pub fn size(&self) -> winit::dpi::PhysicalSize<u32> {
         self.size
+    }
+
+    pub fn get_transform_aligned_size() -> wgpu::BufferAddress {
+        let align = 256; // minimum uniform buffer offset alignment
+        let unaligned = std::mem::size_of::<TransformUniforms>() as wgpu::BufferAddress;
+        ((unaligned + align - 1) / align) * align
     }
 }
