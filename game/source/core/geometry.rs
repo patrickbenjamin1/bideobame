@@ -8,16 +8,13 @@ pub type Colour = [f32; 3];
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
-    position: Vector3,
-    color: Colour,
-    should_wave: u32,
+    pub position: Vector3,
+    pub color: Colour,
 }
 
 impl PartialEq for Vertex {
     fn eq(&self, other: &Self) -> bool {
-        return self.position == other.position
-            && self.color == other.color
-            && self.should_wave == other.should_wave;
+        return self.position == other.position && self.color == other.color;
     }
 }
 
@@ -49,6 +46,11 @@ impl Vertex {
     }
 }
 
+pub struct BoundingBox {
+    pub min: Vector3,
+    pub max: Vector3,
+}
+
 /// STUFF FOR FUCKIN ROUND AND THAT
 
 pub fn get_triangle(centre_x: f32, centre_y: f32, size: f32) -> Vec<Vertex> {
@@ -60,17 +62,14 @@ pub fn get_triangle(centre_x: f32, centre_y: f32, size: f32) -> Vec<Vertex> {
         Vertex {
             position: [x, y + half_size, 0.0],
             color: [1.0, 0.0, 0.0], // Pure red
-            should_wave: 1,
         },
         Vertex {
             position: [x - half_size, y - half_size, 0.0],
             color: [0.0, 1.0, 0.0], // Pure green
-            should_wave: 1,
         },
         Vertex {
             position: [x + half_size, y - half_size, 0.0],
             color: [0.0, 0.0, 1.0], // Pure blue
-            should_wave: 1,
         },
     ];
 }
@@ -84,22 +83,18 @@ pub fn get_ground_quad() -> (Vec<Vertex>, Vec<u16>) {
     vertices.push(Vertex {
         position: [-0.1, 0.0, -0.1],
         color: [1.0, 0.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, 0.0, -0.1],
         color: [0.0, 1.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, 0.0, 0.1],
         color: [0.0, 0.0, 1.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [-0.1, 0.0, 0.1],
         color: [1.0, 1.0, 0.0],
-        should_wave: 0,
     });
 
     indices.push(0);
@@ -122,132 +117,108 @@ pub fn get_cube() -> (Vec<Vertex>, Vec<u16>) {
     vertices.push(Vertex {
         position: [-0.1, -0.1, -0.1],
         color: [1.0, 0.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, -0.1, -0.1],
         color: [0.0, 1.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, 0.1, -0.1],
         color: [0.0, 0.0, 1.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [-0.1, 0.1, -0.1],
         color: [1.0, 1.0, 0.0],
-        should_wave: 0,
     });
 
     // back
     vertices.push(Vertex {
         position: [-0.1, -0.1, 0.1],
         color: [1.0, 0.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, -0.1, 0.1],
         color: [0.0, 1.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, 0.1, 0.1],
         color: [0.0, 0.0, 1.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [-0.1, 0.1, 0.1],
         color: [1.0, 1.0, 0.0],
-        should_wave: 0,
     });
 
     // top
     vertices.push(Vertex {
         position: [-0.1, 0.1, -0.1],
         color: [1.0, 0.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, 0.1, -0.1],
         color: [0.0, 1.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, 0.1, 0.1],
         color: [0.0, 0.0, 1.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [-0.1, 0.1, 0.1],
         color: [1.0, 1.0, 0.0],
-        should_wave: 0,
     });
 
     // bottom
     vertices.push(Vertex {
         position: [-0.1, -0.1, -0.1],
         color: [1.0, 0.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, -0.1, -0.1],
         color: [0.0, 1.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, -0.1, 0.1],
         color: [0.0, 0.0, 1.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [-0.1, -0.1, 0.1],
         color: [1.0, 1.0, 0.0],
-        should_wave: 0,
     });
 
     // left
     vertices.push(Vertex {
         position: [-0.1, -0.1, -0.1],
         color: [1.0, 0.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [-0.1, -0.1, 0.1],
         color: [0.0, 1.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [-0.1, 0.1, 0.1],
         color: [0.0, 0.0, 1.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [-0.1, 0.1, -0.1],
         color: [1.0, 1.0, 0.0],
-        should_wave: 0,
     });
 
     // right
     vertices.push(Vertex {
         position: [0.1, -0.1, -0.1],
         color: [1.0, 0.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, -0.1, 0.1],
         color: [0.0, 1.0, 0.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, 0.1, 0.1],
         color: [0.0, 0.0, 1.0],
-        should_wave: 0,
     });
     vertices.push(Vertex {
         position: [0.1, 0.1, -0.1],
         color: [1.0, 1.0, 0.0],
-        should_wave: 0,
     });
 
     // front

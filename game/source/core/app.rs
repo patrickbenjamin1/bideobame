@@ -1,6 +1,7 @@
 use crate::core::game;
 use crate::core::renderer::Renderer;
 
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use winit::event_loop::ControlFlow;
 use winit::window::WindowBuilder;
@@ -25,13 +26,14 @@ impl App {
         // set event loop to constantly poll
         event_loop.set_control_flow(ControlFlow::wait_duration(Duration::from_millis(16))); // ~60 FPS
 
-        // define global wgpu state - holds device, queue, surface, etc.
-        let mut renderer = Renderer::new(&window).await;
+        // Wrap world and renderer in Arc<RwLock>
+        let renderer = Arc::new(RwLock::new(Renderer::new(&window).await));
+        let world = Arc::new(RwLock::new(game::World::new()));
 
-        // define world (storage for entities, components, and systems)
-        let mut world = game::World::new();
-
-        world.test_world();
+        {
+            let mut world = world.write().unwrap();
+            world.test_world();
+        }
 
         let mut last_frame = Instant::now();
 
@@ -42,13 +44,18 @@ impl App {
             let delta_time = (now - last_frame).as_secs_f32();
             last_frame = now;
 
-            // update world state to reflect time passed
-            world.state().update(delta_time);
+            // Lock world for state update
+            {
+                let mut world = world.write().unwrap();
+                world.state().update(delta_time);
+            }
 
             // handle window events
             match event {
                 winit::event::Event::AboutToWait { .. } => {
                     // run update systems
+                    let mut world = world.write().unwrap();
+                    let mut renderer = renderer.write().unwrap();
                     world.run_update_systems(&mut renderer);
                 }
 
@@ -116,6 +123,7 @@ impl App {
 
                             // update wgpu surface with new size
                             // @todo debounce resize events as this will get expensive
+                            let mut renderer = renderer.write().unwrap();
                             renderer.resize(*physical_size);
 
                             // @todo dispatch resize event to game event system
@@ -131,6 +139,8 @@ impl App {
                         // handle redraw events by submitting them to render on state
                         winit::event::WindowEvent::RedrawRequested => {
                             // Run draw systems only during redraw
+                            let mut world = world.write().unwrap();
+                            let mut renderer = renderer.write().unwrap();
                             world.run_draw_systems(&mut renderer);
                         }
 

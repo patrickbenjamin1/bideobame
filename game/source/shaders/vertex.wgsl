@@ -7,7 +7,6 @@ struct VertexInput {
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) color: vec3<f32>,
-    @location(1) should_wave: u32,
 };
 
 struct Uniforms {
@@ -40,7 +39,6 @@ fn vs_main(
     out.clip_position = uniforms.projection * uniforms.view * transform * vec4<f32>(position, 1.0);
     
     out.color = model.color;
-    out.should_wave = model.should_wave;
     
     return out;
 }

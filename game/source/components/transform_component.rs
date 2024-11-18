@@ -73,7 +73,7 @@ impl TransformComponent {
         self.update_model_matrix();
     }
 
-    pub fn update_model_matrix(&mut self) {
+    fn update_model_matrix(&mut self) {
         self.model_matrix = Mat4::from_translation(Vec3::from_slice(&self.position))
             * Mat4::from_euler(
                 EulerRot::XYZ,
@@ -82,5 +82,16 @@ impl TransformComponent {
                 self.rotation[2],
             )
             * Mat4::from_scale(Vec3::from_slice(&self.scale));
+    }
+
+    pub fn apply_to_vertex(&self, vertex: &geometry::Vertex) -> geometry::Vertex {
+        let mut new_vertex = vertex.clone();
+
+        let pos = Vec3::from_slice(&vertex.position);
+        let pos_vec4 = pos.extend(1.0);
+        let transformed = self.model_matrix * pos_vec4;
+        new_vertex.position = transformed.truncate().to_array();
+
+        new_vertex
     }
 }

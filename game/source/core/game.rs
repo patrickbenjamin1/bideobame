@@ -1,14 +1,15 @@
+use crate::components::collider_component;
 use crate::components::mesh_component;
 use crate::components::movement_component;
-use crate::components::rigidbody_component;
 use crate::components::transform_component;
+
 use crate::core::renderer;
 use crate::core::state;
 use crate::systems::movement_system;
-use crate::systems::{mesh_bufferer_system, mesh_renderer_system};
+use crate::systems::{collision_system, mesh_bufferer_system, mesh_renderer_system};
 
-use std::any::Any;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 
 use super::geometry;
@@ -24,7 +25,7 @@ pub enum ComponentType {
     Mesh,
     Transform,
     Movement,
-    RigidBody,
+    Collider,
 }
 
 // Define an enum to hold different component types
@@ -32,7 +33,7 @@ pub enum ComponentEnum {
     Mesh(mesh_component::MeshComponent),
     Transform(transform_component::TransformComponent),
     Movement(movement_component::MovementComponent),
-    RigidBody(rigidbody_component::RigidBodyComponent),
+    Collider(collider_component::ColliderComponent),
     // Add other component types here
 }
 
@@ -42,7 +43,7 @@ impl ComponentEnum {
             ComponentEnum::Mesh(_) => ComponentType::Mesh,
             ComponentEnum::Transform(_) => ComponentType::Transform,
             ComponentEnum::Movement(_) => ComponentType::Movement,
-            ComponentEnum::RigidBody(_) => ComponentType::RigidBody,
+            ComponentEnum::Collider(_) => ComponentType::Collider,
         }
     }
 }
@@ -181,12 +182,8 @@ impl Entity {
     }
 
     pub fn generate_id() -> EntityId {
-        static NEXT_ID: Mutex<EntityId> = Mutex::new(0);
-
-        let mut id = NEXT_ID.lock().unwrap();
-        *id += 1;
-
-        *id
+        static NEXT_ID: AtomicU32 = AtomicU32::new(0);
+        NEXT_ID.fetch_add(1, Ordering::SeqCst)
     }
 }
 
@@ -304,18 +301,11 @@ impl World {
             )),
         );
 
-        self.add_component(
-            cube_entity_id,
-            ComponentEnum::RigidBody(rigidbody_component::RigidBodyComponent::new()),
-        );
-
-        println!("Adding MeshBufferer system");
         self.add_update_system(mesh_bufferer_system::MeshBufferer {});
-
-        println!("Adding MeshRenderer system");
-        self.add_draw_system(mesh_renderer_system::MeshRenderer {});
-
         self.add_update_system(movement_system::MovementSystem {});
+        self.add_update_system(collision_system::CollisionSystem {});
+
+        self.add_draw_system(mesh_renderer_system::MeshRenderer {});
     }
 
     // accessors

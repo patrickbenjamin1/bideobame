@@ -33,6 +33,15 @@ impl game::System for MovementSystem {
                     velocity[1] * delta_time,
                     velocity[2] * delta_time,
                 ]);
+
+                // check if there's a collision system on the entity
+                if let Some(ComponentEnum::Collider(collider)) = world
+                    .component_storage_mut()
+                    .get_component_mut(entity_id, |c| matches!(c, ComponentEnum::Collider(_)))
+                {
+                    // tell the collider to update its bounds
+                    collider.invalidate_bounds();
+                }
             }
 
             // Finally update movement component with new velocity
