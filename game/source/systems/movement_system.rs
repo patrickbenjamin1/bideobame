@@ -1,4 +1,4 @@
-use crate::core::game::{ComponentEnum, ComponentType};
+use crate::core::game::{ComponentType, ComponentTypes};
 use crate::core::{game, renderer};
 
 pub struct MovementSystem {}
@@ -14,7 +14,7 @@ impl game::System for MovementSystem {
             let velocity;
             let acceleration;
 
-            if let Some(ComponentEnum::Movement(movement)) =
+            if let Some(ComponentTypes::Movement(movement)) =
                 world.get_entity_component_by_type(entity_id, ComponentType::Movement)
             {
                 velocity = movement.velocity;
@@ -24,9 +24,9 @@ impl game::System for MovementSystem {
             }
 
             // Update transform with the collected movement data
-            if let Some(ComponentEnum::Transform(transform)) = world
+            if let Some(ComponentTypes::Transform(transform)) = world
                 .component_storage_mut()
-                .get_component_mut(entity_id, |c| matches!(c, ComponentEnum::Transform(_)))
+                .get_component_mut(entity_id, |c| matches!(c, ComponentTypes::Transform(_)))
             {
                 transform.translate([
                     velocity[0] * delta_time,
@@ -35,9 +35,9 @@ impl game::System for MovementSystem {
                 ]);
 
                 // check if there's a collision system on the entity
-                if let Some(ComponentEnum::Collider(collider)) = world
+                if let Some(ComponentTypes::Collider(collider)) = world
                     .component_storage_mut()
-                    .get_component_mut(entity_id, |c| matches!(c, ComponentEnum::Collider(_)))
+                    .get_component_mut(entity_id, |c| matches!(c, ComponentTypes::Collider(_)))
                 {
                     // tell the collider to update its bounds
                     collider.invalidate_bounds();
@@ -45,9 +45,9 @@ impl game::System for MovementSystem {
             }
 
             // Finally update movement component with new velocity
-            if let Some(ComponentEnum::Movement(movement)) = world
+            if let Some(ComponentTypes::Movement(movement)) = world
                 .component_storage_mut()
-                .get_component_mut(entity_id, |c| matches!(c, ComponentEnum::Movement(_)))
+                .get_component_mut(entity_id, |c| matches!(c, ComponentTypes::Movement(_)))
             {
                 movement.velocity[0] += acceleration[0] * delta_time;
                 movement.velocity[1] += acceleration[1] * delta_time;

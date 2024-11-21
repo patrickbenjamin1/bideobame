@@ -1,5 +1,5 @@
 use crate::components::{collider_component, mesh_component, transform_component};
-use crate::core::game::{ComponentEnum, ComponentType};
+use crate::core::game::{ComponentTypes, ComponentType};
 use crate::core::geometry;
 use crate::core::{game, renderer};
 
@@ -67,7 +67,7 @@ impl game::System for CollisionSystem {
                     ],
                 );
 
-                if let [ComponentEnum::Collider(collider), ComponentEnum::Transform(transform), ComponentEnum::Mesh(mesh)] =
+                if let [ComponentTypes::Collider(collider), ComponentTypes::Transform(transform), ComponentTypes::Mesh(mesh)] =
                     components.as_mut_slice()
                 {
                     // if the collider needs to update its aabb, update it
@@ -92,7 +92,7 @@ impl game::System for CollisionSystem {
                     ],
                 );
 
-                if let [ComponentEnum::Collider(collider), ComponentEnum::Transform(transform), ComponentEnum::Mesh(mesh)] =
+                if let [ComponentTypes::Collider(collider), ComponentTypes::Transform(transform), ComponentTypes::Mesh(mesh)] =
                     components.as_mut_slice()
                 {
                     // loop through all entities again to check for collisions
@@ -112,7 +112,7 @@ impl game::System for CollisionSystem {
                         //     ],
                         // );
 
-                        // if let [ComponentEnum::Collider(other_collider), ComponentEnum::Transform(other_transform), ComponentEnum::Mesh(other_mesh)] =
+                        // if let [ComponentTypes::Collider(other_collider), ComponentTypes::Transform(other_transform), ComponentTypes::Mesh(other_mesh)] =
                         //     other_components.as_mut_slice()
                         // {
                         //     // check for collision

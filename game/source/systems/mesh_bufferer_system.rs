@@ -8,7 +8,7 @@ impl game::System for MeshBufferer {
         let mesh_components = world.get_components_by_type_mut(game::ComponentType::Mesh);
 
         for (_, component) in mesh_components {
-            if let game::ComponentEnum::Mesh(mesh_component) = component {
+            if let game::ComponentTypes::Mesh(mesh_component) = component {
                 if mesh_component.vertex_buffer.is_none() && mesh_component.needs_rebuffer {
                     let device = renderer.device();
                     let locked_device = device.lock().unwrap();

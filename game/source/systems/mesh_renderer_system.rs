@@ -87,8 +87,8 @@ impl game::System for MeshRenderer {
                     world.get_entity_component_by_type(entity_id, game::ComponentType::Transform);
 
                 if let (
-                    Some(game::ComponentEnum::Mesh(mesh)),
-                    Some(game::ComponentEnum::Transform(transform)),
+                    Some(game::ComponentTypes::Mesh(mesh)),
+                    Some(game::ComponentTypes::Transform(transform)),
                 ) = (mesh, transform)
                 {
                     if let (Some(vertex_buffer), Some(index_buffer)) =
